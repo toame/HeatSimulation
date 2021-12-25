@@ -2,6 +2,9 @@
 #include <random>
 #include <cmath>
 #include <chrono>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -25,6 +28,8 @@
 #else
     #define SLASH "/"
 #endif
+std::string outputDir = "data" SLASH + std::to_string(ID) + SLASH "N=" + std::to_string(SIZE) + SLASH;
+
 using namespace std;
 
 __global__ 
@@ -159,7 +164,7 @@ private:
 
     long long int HeatSimulation;           // モデル全体に熱浴をかける（収束を早めたいため）
     long long int initialStateStep;         // 統計量を測定開始するステップ数（最初は収束していないため）
-    long long int Step;                     // 全体のステップ数
+    long long int allSteps;                     // 全体のステップ数
 
     const double temp_h = 1.2;              // 高温熱浴の温度
     const double temp_l = 0.8;              // 低温熱浴の温度
@@ -208,7 +213,7 @@ public:
         n3_L = n2_R + 1;
         n3_R = n3_L + HeatBath_size - 1;
         model_size = n3_R + 2;
-        BATCH = min(256, (1 << 26) / model_size);
+        BATCH = min(1024, (1 << 26) / model_size);
         cerr << n1_L << "," << n1_R << "," << n2_L << "," << n2_R << "," << n3_L << "," << n3_R <<"," << model_size <<  endl;
 
         h_ct_c = (double *)malloc(sizeof(double)* (model_size + 256));
@@ -249,10 +254,10 @@ public:
         setCurand<<<grid_size,block_size>>>(1, state);
         qinit<<<grid_size,block_size>>>(q0, q1, model_size);
     }
-    void settingStep(const long long int HeatSimulation_, const long long int initialStateStep_, const long long int Step_) {
+    void settingStep(const long long int HeatSimulation_, const long long int initialStateStep_, const long long int allSteps_) {
         HeatSimulation = HeatSimulation_;
         initialStateStep = initialStateStep_;
-        Step = Step_;
+        allSteps = allSteps_;
     }
     // 進行度の出力
     void showProcessing() {
@@ -262,7 +267,7 @@ public:
         cudaMemcpy(h_q0L, q0 + (n1_L + n1_R) / 2, sizeof(double), cudaMemcpyDeviceToHost);
         cudaMemcpy(h_q0M, q0 + middle_size / 2, sizeof(double), cudaMemcpyDeviceToHost);
         cudaMemcpy(h_q0R, q0 + (n3_L + n3_R) / 2, sizeof(double), cudaMemcpyDeviceToHost);
-        std::cerr << *h_q0L << " " << *h_q0M << " " << *h_q0R << std::endl;
+        std::cerr << stepCount << "," << *h_q0L << "," << *h_q0M << "," << *h_q0R << "," << calc_Kappa() << ",";
         assert(*h_q0M < 1e+10);
 
         free(h_q0L); free(h_q0M); free(h_q0R);
@@ -320,7 +325,7 @@ public:
         dim3 block_size = dim3(blockSize, 1, 1);
         statistics_reset_d<<<grid_size,block_size>>>(d_fluxC, d_temperature_plot, model_size);
     }
-    void output_Kappa() {
+    double calc_Kappa() {
         dim3 grid_size = dim3(model_size / blockSize + 1, 1, 1);
         dim3 block_size = dim3(blockSize, 1, 1);
         //statistics_reset_test<<<grid_size,block_size>>>(d_fluxC, state, model_size);
@@ -333,22 +338,37 @@ public:
         }
         const double ave_flux = sum_flux / count0 / count_flux;
         const double ave_kappa = ave_flux / (temp_h - temp_l) * middle_size;
-        cerr << stepCount << "," << sum_flux << "," << ave_kappa << "," << count_flux << ",";
+        return ave_kappa;
+    }
 
+    void output_Kappa() {
+        std::string FileNameKappa = outputDir + "kappa.txt";
+        std::ofstream kappaOutputFile(FileNameKappa, std::ios::app);
+        kappaOutputFile << stepCount << "," <<  std::fixed << std::setprecision(12) << calc_Kappa() << "," << count_flux << endl;
     }
 
     void output_Temperature() {
+        const int num = (double)stepCount/(double)allSteps * 100.0 + 0.01;     
+        std::ostringstream sout;
+        sout << "_" << std::setfill('0') << std::setw(3) << num;
+        std::string num0 = sout.str(); 
+        std::string FileNameTemp = outputDir + "Temperature" + num0 + ".txt";
+        std::ofstream temperatureOutputFile(FileNameTemp);
+
         cudaMemcpy(h_temperature_plot, d_temperature_plot, sizeof(double) * model_size, cudaMemcpyDeviceToHost);
         for(int i = 0; i < model_size; i++) {
-            cerr << i << "," << h_temperature_plot[i] / count_temp << endl;
+            temperatureOutputFile << i << "," << std::fixed << std::setprecision(12) << h_temperature_plot[i] / count_temp << endl;
         }
     }
     void output_modalFlux() {
+        const int num = (double)stepCount/(double)allSteps * 100.0 + 0.01;     
+        std::ostringstream sout;
+        sout << "_" << std::setfill('0') << std::setw(3) << num;
+        std::string num0 = sout.str(); 
+        std::string FileNameModalFlux = outputDir + "modalFlux" + num0 + ".txt";
+        std::ofstream modalFluxOutputFile(FileNameModalFlux);
+
         cudaMemcpy(h_Usum, d_Usum, middle_size * sizeof(double), cudaMemcpyDeviceToHost);
-        cerr << middle_size/2 << endl;
-        for(int i = 0; i < middle_size; i++) {
-            cerr << i << "," << h_Usum[i] << "," << count_modal_flux_actu << endl;
-        }
         if(count_modal_flux_actu == 0) count_modal_flux_actu = 1;
         for(int km=0; km<middle_size/2; km++){
             const int km1=middle_size/2+km; // k>0
@@ -358,7 +378,7 @@ public:
             const double mode_flux1=vg1*h_Usum[km1]/(double)count_modal_flux_actu/(double)middle_size;
             const double mode_flux2=vg2*h_Usum[km2]/(double)count_modal_flux_actu/(double)middle_size;
             const double mode_flux = mode_flux1+mode_flux2;
-            cerr << km << "," << (double)km/(double)middle_size << "," << mode_flux << "," << mode_flux1 << "," << mode_flux2 << "," << count_modal_flux_actu << endl;
+            modalFluxOutputFile << km << "," << std::fixed << std::setprecision(8) << (double)km/(double)middle_size << "," << mode_flux << "," << mode_flux1 << "," << mode_flux2 << "," << count_modal_flux_actu << endl;
         }
     }
 
@@ -366,27 +386,32 @@ public:
 
 int main(void) {
     FPUT_Lattice_1D model = FPUT_Lattice_1D();
-    const int initialHeatSteps = 10000;
-    const int initialStateSteps = 100000;
-    const int allSteps = 10000000;
-    model.settingSize(20, 512);
+    const int initialHeatSteps = 100000;
+    const int initialStateSteps = 10000000;
+    const int allSteps = 100000000;
+    const int output_file_interval = allSteps / 20;
+    const int output_cerr_interval = allSteps / 500;
+    model.settingSize(20, SIZE);
     model.settingStep(initialHeatSteps, initialStateSteps, allSteps);
     std::chrono::system_clock::time_point  start, end; // 型は auto で可
     start = std::chrono::system_clock::now(); // 計測開始時間
  
-
     for(int i = 0; i < allSteps;i++) {
-        if(i == 10000)
+        if(i == initialStateSteps)
             model.statistics_reset();
         model.step();
-        if((i + 1) % (50000/1) == 0) {
+        if((i + 1) % output_cerr_interval == 0) {
             model.showProcessing();
             end = std::chrono::system_clock::now();  // 計測終了時間
             double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count(); //処理に要した時間をミリ秒に変換
-            model.output_Kappa();
+            if(i > initialStateSteps)
+                model.output_Kappa();
             cerr << elapsed/1000.0/60.0/60.0 << "[h]" << "," << elapsed/1000.0/60.0/60.0/i * allSteps << "[h]" << endl;
         }
+        if((i + 1) % output_file_interval == 0 && i > initialStateSteps) {
+            model.output_Temperature();
+            model.output_modalFlux();
+        }
     }
-    model.output_Temperature();
-    model.output_modalFlux();
+    
 }
