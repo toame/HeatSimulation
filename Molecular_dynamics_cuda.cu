@@ -10,6 +10,7 @@
 #include <time.h>
 #include <cuda.h>
 #include <curand_kernel.h>
+#include <cooperative_groups.h>
 #include <cufft.h>
 #include <cassert>
 #define blockSize (64)
@@ -62,13 +63,13 @@ void Update(double* q2, const double* q1, const double *q0,curandState *state,  
 {
     const int thread_id = threadIdx.x+blockDim.x*blockIdx.x;
     const int i = thread_id + 1;
+    const int is_middleL = (n2_L < i && i <= n2_R);
+    const int is_middleR = (n2_L <= i && i < n2_R);
+    
+    const double muL = is_middleL * mu1 + !(is_middleL) * mu1_bath;
+    const double muR = is_middleR * mu1 + !(is_middleR) * mu1_bath;
+    double dq2;
     if(i <= n3_R) {
-        const int is_middleL = (n2_L < i && i <= n2_R);
-        const int is_middleR = (n2_L <= i && i < n2_R);
-        
-        const double muL = is_middleL * mu1 + !(is_middleL) * mu1_bath;
-        const double muR = is_middleR * mu1 + !(is_middleR) * mu1_bath;
-
         const double f_R = muR * (q1[i + 1] - q1[i]);
         const double f_L = muL * (q1[i] - q1[i - 1]);
         const double l_f = f_R - f_L;
@@ -81,7 +82,7 @@ void Update(double* q2, const double* q1, const double *q0,curandState *state,  
         const double random_f = (is_heat || i <= n1_R || i >= n3_L) ? (-gamma_t * dq1 + ct_c[i] * curand_normal(&state[i])) : 0;
 
         const double f = l_f + nl_f - mu0 * q1[i];
-        const double dq2 = dq1 + f * dt2 + random_f;  
+        dq2 = dq1 + f * dt2 + random_f;  
 
         q2[i] = q1[i] + dq2;
     }
@@ -236,11 +237,34 @@ public:
         for(int i = n1_L; i <= n1_R; i++) {
             h_ct_c[i] = ct_h;
         }
-        for(int i = n2_L; i <= n2_R; i++) {
-            const double temp_c = temp_h - (temp_h - temp_l) * (i - n2_L)/(n2_R - n2_L + 1);
-            const double c_c = sqrt(2.0*gamma0*temp_c*dt); 
-            h_ct_c[i] = c_c * dt;
+        std::string inputDir = "data" SLASH + std::to_string(ID) + SLASH "N=" + std::to_string(SIZE/2) + SLASH;
+        std::string inputFile = inputDir + "Temperature_100.txt";
+        std::ifstream inputTemperature(inputFile);
+        if (inputTemperature.fail()) {
+            for(int i = n2_L; i <= n2_R; i++) {
+                const double temp_c = temp_h - (temp_h - temp_l) * (i - n2_L)/(n2_R - n2_L + 1);
+                const double c_c = sqrt(2.0*gamma0*temp_c*dt); 
+                h_ct_c[i] = c_c * dt;
+            }
+        } else {
+            std::string str, s;
+            while (getline(inputTemperature, str)) {
+                std::vector<std::string> v; 
+                std::stringstream ss{str};             
+                while ( getline(ss, s, ' ') ){    
+                    v.push_back(s);
+                }
+                if(v.size() < 2) continue;
+                const int i = stoi(v[0]);
+                const double temp_ic = stod(v[1]);
+                if(i >= n2_L && i <= n2_R) {
+                    h_ct_c[i * 2 - n2_L] = sqrt(2.0 * gamma0 * temp_ic * dt) * dt;
+                    h_ct_c[i * 2 - n2_L] = sqrt(2.0 * gamma0 * temp_ic * dt) * dt;
+                }
+            }
+            std::cerr << "previous_ok" << std::endl;
         }
+        
         for(int i = n3_L; i <= n3_R; i++) {
             h_ct_c[i] = ct_l;
         }
@@ -300,12 +324,14 @@ public:
             count_temp++;
             count_modal_flux++;
             count_modal_flux_temp++;
-            
+            swap(q0, q1);
+            swap(q1, q2);
         } else {
             Update<<<grid_size,block_size>>>(q2, q1, q0, state,d_ct_c, d_fluxC, d_temperature_plot, n1_L, n1_R, n2_L, n2_R, n3_L, n3_R, stepCount < initialHeatSteps);
+            swap(q0, q1);
+            swap(q1, q2);
         }
-        swap(q0, q1);
-        swap(q1, q2);
+        
         
         stepCount += 1;
     }
