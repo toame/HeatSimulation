@@ -359,7 +359,7 @@ public:
 
         cudaMemcpy(h_temperature_plot, d_temperature_plot, sizeof(double) * model_size, cudaMemcpyDeviceToHost);
         for(int i = 0; i < model_size; i++) {
-            temperatureOutputFile << i << "," << std::fixed << std::setprecision(12) << h_temperature_plot[i] / count_temp << endl;
+            temperatureOutputFile << i << "," << std::fixed << std::setprecision(12) << h_temperature_plot[i] / count_temp << "," << count_temp << endl;
         }
     }
     void output_modalFlux() {
