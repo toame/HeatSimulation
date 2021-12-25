@@ -17,7 +17,7 @@
 #define mu1_bath (1)
 #define mu0 (0)
 #define beta0 (1)
-#define dt (0.05)              // 時間刻み幅
+//#define dt (0.05)              // 時間刻み幅
 #define dt_1 (1.0 / dt)
 #define dt2 (dt * dt)
 #define gamma0 (0.2)          // Langevin熱浴のgamma係数
@@ -162,10 +162,6 @@ private:
     int n3_R;                               // 低温熱浴の右端のインデックス
     int model_size;                         // モデル全体の粒子数
 
-    long long int HeatSimulation;           // モデル全体に熱浴をかける（収束を早めたいため）
-    long long int initialStateStep;         // 統計量を測定開始するステップ数（最初は収束していないため）
-    long long int allSteps;                     // 全体のステップ数
-
     const double temp_h = 1.2;              // 高温熱浴の温度
     const double temp_l = 0.8;              // 低温熱浴の温度
 
@@ -254,11 +250,6 @@ public:
         setCurand<<<grid_size,block_size>>>(1, state);
         qinit<<<grid_size,block_size>>>(q0, q1, model_size);
     }
-    void settingStep(const long long int HeatSimulation_, const long long int initialStateStep_, const long long int allSteps_) {
-        HeatSimulation = HeatSimulation_;
-        initialStateStep = initialStateStep_;
-        allSteps = allSteps_;
-    }
     // 進行度の出力
     void showProcessing() {
         double *h_q0L = (double*) malloc(sizeof(double));
@@ -276,10 +267,10 @@ public:
     void step() {
         dim3 grid_size = dim3(model_size / blockSize + 1, 1, 1);
         dim3 block_size = dim3(blockSize, 1, 1);
-        if(stepCount % interval == 0 && stepCount >= initialStateStep) {
+        if(stepCount % interval == 0 && stepCount >= initialStateSteps) {
             //void Update2(float *p, int batch_num, int middle_size, double *q2, const double *q1, float *q1_f, const double *q0, curandState *state, double *ct_c, double *fluxC, double *temperature_plot, int n1_L, int n1_R, int n2_L, int n2_R, int n3_L, int n3_R, bool is_heat)
 
-            Update2<<<grid_size,block_size>>>(d_real2, count_modal_flux % BATCH, middle_size,  q2, q1,q1_f, q0, state,d_ct_c, d_fluxC, d_temperature_plot, n1_L, n1_R, n2_L, n2_R, n3_L, n3_R, stepCount < HeatSimulation);
+            Update2<<<grid_size,block_size>>>(d_real2, count_modal_flux % BATCH, middle_size,  q2, q1,q1_f, q0, state,d_ct_c, d_fluxC, d_temperature_plot, n1_L, n1_R, n2_L, n2_R, n3_L, n3_R, stepCount < initialHeatSteps);
             cudaMemcpy(d_real1 + middle_size * (count_modal_flux % BATCH), q1_f + n2_L, sizeof(float) * middle_size , cudaMemcpyDeviceToDevice);
             calcMomentam<<<grid_size, block_size>>>(d_real2, q2, q0, n2_L, middle_size, (count_modal_flux % BATCH));
             grid_size = dim3(middle_size/blockSize, 1, 1);
@@ -311,7 +302,7 @@ public:
             count_modal_flux_temp++;
             
         } else {
-            Update<<<grid_size,block_size>>>(q2, q1, q0, state,d_ct_c, d_fluxC, d_temperature_plot, n1_L, n1_R, n2_L, n2_R, n3_L, n3_R, stepCount < HeatSimulation);
+            Update<<<grid_size,block_size>>>(q2, q1, q0, state,d_ct_c, d_fluxC, d_temperature_plot, n1_L, n1_R, n2_L, n2_R, n3_L, n3_R, stepCount < initialHeatSteps);
         }
         swap(q0, q1);
         swap(q1, q2);
@@ -339,6 +330,17 @@ public:
         const double ave_flux = sum_flux / count0 / count_flux;
         const double ave_kappa = ave_flux / (temp_h - temp_l) * middle_size;
         return ave_kappa;
+    }
+    void output_setting() {
+        std::string FileNameSetting = outputDir + "Setting.txt";
+        std::ofstream settingOutputFile(FileNameSetting);
+        settingOutputFile << "allSteps," << allSteps << endl;
+        settingOutputFile << "initialStateSteps," << initialStateSteps << endl;
+        settingOutputFile << "initialHeatSteps," << initialHeatSteps << endl;
+        settingOutputFile << "dt," << dt << endl;
+        settingOutputFile << "mu0," << mu0 << endl;
+        settingOutputFile << "mu1," << mu1 << endl;
+        settingOutputFile << "beta0," << beta0 << endl;
     }
 
     void output_Kappa() {
@@ -386,16 +388,13 @@ public:
 
 int main(void) {
     FPUT_Lattice_1D model = FPUT_Lattice_1D();
-    const int initialHeatSteps = 100000;
-    const int initialStateSteps = 10000000;
-    const int allSteps = 100000000;
+
     const int output_file_interval = allSteps / 20;
     const int output_cerr_interval = allSteps / 500;
     model.settingSize(20, SIZE);
-    model.settingStep(initialHeatSteps, initialStateSteps, allSteps);
     std::chrono::system_clock::time_point  start, end; // 型は auto で可
     start = std::chrono::system_clock::now(); // 計測開始時間
- 
+    model.output_setting();
     for(int i = 0; i < allSteps;i++) {
         if(i == initialStateSteps)
             model.statistics_reset();
