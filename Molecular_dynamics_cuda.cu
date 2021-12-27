@@ -14,7 +14,7 @@
 #include <cufft.h>
 #include <cassert>
 #define blockSize (64)
-#define mu1 (1)
+//#define mu1 (1)
 #define mu1_bath (1)
 #define mu0 (0)
 #define beta0 (1)
