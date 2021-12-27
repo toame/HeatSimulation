@@ -360,6 +360,8 @@ public:
     void output_setting() {
         std::string FileNameSetting = outputDir + "Setting.txt";
         std::ofstream settingOutputFile(FileNameSetting);
+        settingOutputFile << "n," << middle_size << endl;
+        settingOutputFile << "HeatBath_size," << HeatBath_size << endl;
         settingOutputFile << "allSteps," << allSteps << endl;
         settingOutputFile << "initialStateSteps," << initialStateSteps << endl;
         settingOutputFile << "initialHeatSteps," << initialHeatSteps << endl;
@@ -416,16 +418,17 @@ int main(void) {
     FPUT_Lattice_1D model = FPUT_Lattice_1D();
 
     const long long int output_file_interval = allSteps / 20;
-    const long long int output_cerr_interval = allSteps / 500;
+    const long long int output_cerr_interval = allSteps / 1000;
+    const long long int output_cerr_interval2 = allSteps / 50000;
     model.settingSize(20, SIZE);
     std::chrono::system_clock::time_point  start, end; // 型は auto で可
     start = std::chrono::system_clock::now(); // 計測開始時間
     model.output_setting();
-    for(long long int i = 0; i < allSteps;i++) {
+    for(int i = 0; i < allSteps;i++) {
         if(i == initialStateSteps)
             model.statistics_reset();
         model.step();
-        if((i + 1) % output_cerr_interval == 0) {
+        if((i + 1) % output_cerr_interval == 0 || (i < initialHeatSteps && (i + 1) % output_cerr_interval2 == 0)) {
             model.showProcessing();
             end = std::chrono::system_clock::now();  // 計測終了時間
             double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count(); //処理に要した時間をミリ秒に変換
