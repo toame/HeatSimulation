@@ -233,7 +233,7 @@ public:
         cudaMalloc(&q1_f, sizeof(float) * (model_size + 256));
         cudaMalloc(&q2, sizeof(double) * (model_size + 256));
         
-        cudaMalloc(&state,  sizeof(double) * (model_size + 256) * sizeof(curandState));
+        cudaMalloc(&state,  (model_size + 256) * sizeof(curandState));
         for(int i = n1_L; i <= n1_R; i++) {
             h_ct_c[i] = ct_h;
         }
