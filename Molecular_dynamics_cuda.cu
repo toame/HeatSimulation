@@ -251,7 +251,7 @@ public:
             while (getline(inputTemperature, str)) {
                 std::vector<std::string> v; 
                 std::stringstream ss{str};             
-                while ( getline(ss, s, ' ') ){    
+                while ( getline(ss, s, ',') ){    
                     v.push_back(s);
                 }
                 if(v.size() < 2) continue;
