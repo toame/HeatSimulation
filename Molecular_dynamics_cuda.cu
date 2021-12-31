@@ -257,17 +257,15 @@ public:
                 if(v.size() < 2) continue;
                 const int i = stoi(v[0]);
                 const double temp_ic = stod(v[1]);
-                if(i >= n2_L && i <= n2_R) {
-                    h_ct_c[i * 2 - n2_L] = sqrt(2.0 * gamma0 * temp_ic * dt) * dt;
-                    h_ct_c[i * 2 - n2_L + 1] = sqrt(2.0 * gamma0 * temp_ic * dt) * dt;
+                if(i * 2 >= n2_L && i * 2 <= n2_R) {
+                    h_ct_c[i * 2] = sqrt(2.0 * gamma0 * temp_ic * dt) * dt;
+                    h_ct_c[i * 2 + 1] = sqrt(2.0 * gamma0 * temp_ic * dt) * dt;
                 }
             }
             std::cerr << "previous_ok" << std::endl;
         }
-        
         for(int i = n3_L; i <= n3_R; i++) {
-            h_ct_c[i * 2] = ct_l;
-            h_ct_c[i * 2 + 1] = ct_l;
+            h_ct_c[i] = ct_l;
         }
         cudaMemcpy(d_ct_c, h_ct_c, sizeof(double) * model_size, cudaMemcpyHostToDevice);
         dim3 grid_size = dim3(model_size / blockSize + 1, 1, 1);
