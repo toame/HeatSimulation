@@ -266,7 +266,8 @@ public:
         }
         
         for(int i = n3_L; i <= n3_R; i++) {
-            h_ct_c[i] = ct_l;
+            h_ct_c[i * 2] = ct_l;
+            h_ct_c[i * 2 + 1] = ct_l;
         }
         cudaMemcpy(d_ct_c, h_ct_c, sizeof(double) * model_size, cudaMemcpyHostToDevice);
         dim3 grid_size = dim3(model_size / blockSize + 1, 1, 1);
