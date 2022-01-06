@@ -423,7 +423,7 @@ int main(void) {
     std::chrono::system_clock::time_point  start, end; // 型は auto で可
     start = std::chrono::system_clock::now(); // 計測開始時間
     model.output_setting();
-    for(int i = 0; i < allSteps;i++) {
+    for(long long int i = 0; i < allSteps;i++) {
         if(i == initialStateSteps)
             model.statistics_reset();
         model.step();
