@@ -240,13 +240,12 @@ public:
         std::string inputDir = "data" SLASH + std::to_string(ID) + SLASH "N=" + std::to_string(SIZE/2) + SLASH;
         std::string inputFile = inputDir + "Temperature_100.txt";
         std::ifstream inputTemperature(inputFile);
-        if (inputTemperature.fail()) {
-            for(int i = n2_L; i <= n2_R; i++) {
-                const double temp_c = temp_h - (temp_h - temp_l) * (i - n2_L)/(n2_R - n2_L + 1);
-                const double c_c = sqrt(2.0*gamma0*temp_c*dt); 
-                h_ct_c[i] = c_c * dt;
-            }
-        } else {
+        for(int i = n2_L; i <= n2_R; i++) {
+            const double temp_c = temp_h - (temp_h - temp_l) * (i - n2_L)/(n2_R - n2_L + 1);
+            const double c_c = sqrt(2.0*gamma0*temp_c*dt); 
+            h_ct_c[i] = c_c * dt;
+        }
+        if (!inputTemperature.fail()) {
             std::string str, s;
             while (getline(inputTemperature, str)) {
                 std::vector<std::string> v; 
