@@ -256,7 +256,7 @@ public:
                 if(v.size() < 2) continue;
                 const int i = stoi(v[0]);
                 const double temp_ic = stod(v[1]);
-                if(i >= n2_L && i <= n2_R) {
+                if((i - n2_L) * 2 + n2_L >= n2_L && i <= (i - n2_L) * 2 + n2_L + 1) {
                     h_ct_c[(i - n2_L) * 2 + n2_L] = sqrt(2.0 * gamma0 * temp_ic * dt) * dt;
                     h_ct_c[(i - n2_L) * 2 + n2_L + 1] = sqrt(2.0 * gamma0 * temp_ic * dt) * dt;
                 }
