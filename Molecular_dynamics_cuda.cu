@@ -111,7 +111,7 @@ void Update2(float* p, const int batch_num, const int middle_size, double* q2, c
         const double dq1 = q1[i] - q0[i];
         const double random_f = (is_heat || i <= n1_R || i >= n3_L) ? (-gamma_t * dq1 + ct_c[i] * curand_normal(&state[i])) : 0;
 
-        const double f = l_f + nl_f - mu0 * q1[i];
+        const double f = l_f + nl_f - mu0 * q1[i] * (n2_L <= i && i <= n2_R);
         const double dq2 = dq1 + f * dt2 + random_f;  
 
         q2[i] = q1[i] + dq2;
