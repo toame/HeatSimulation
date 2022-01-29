@@ -16,8 +16,8 @@
 #define blockSize (64)
 //#define mu1 (1)
 #define mu1_bath (1)
-#define mu0 (0)
-#define beta0 (1)
+#define mu0 (1)
+#define beta0 (0.1)
 //#define dt (0.05)              // 時間刻み幅
 #define dt_1 (1.0 / dt)
 #define dt2 (dt * dt)
