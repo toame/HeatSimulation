@@ -32,7 +32,7 @@
 std::string outputDir = "data" SLASH + std::to_string(ID) + SLASH "N=" + std::to_string(SIZE) + SLASH;
 
 using namespace std;
-
+__constant__ float d_beta[605];
 __global__ 
 void setCurand(unsigned long long seed, curandState *state){
     unsigned int i_global = threadIdx.x + blockIdx.x * blockDim.x;
@@ -74,8 +74,12 @@ void Update(double* q2, const double* q1, const double *q0,curandState *state,  
         const double f_L = muL * (q1[i] - q1[i - 1]);
         const double l_f = f_R - f_L;
 
-        const double nf_R = (is_middleR) * beta0 * (q1[i + 1] - q1[i]) * (q1[i + 1] - q1[i]) * (q1[i + 1] - q1[i]);
-        const double nf_L = (is_middleL) * beta0 * (q1[i - 1] - q1[i]) * (q1[i - 1] - q1[i]) * (q1[i - 1] - q1[i]);
+        double nf_R = 0.0;
+        double nf_L = 0.0;
+        for(int r = 1; r <= truncationOrder; r++) {
+            nf_R += (is_middleR) * d_beta[r] * (q1[i + r] - q1[i]) * (q1[i + r] - q1[i]) * (q1[i + r] - q1[i]) * (i + r <= n2_R);
+            nf_L += (is_middleL) * d_beta[r] * (q1[i - r] - q1[i]) * (q1[i - r] - q1[i]) * (q1[i - r] - q1[i]) * (i - r >= n2_L);
+        }
         const double nl_f = nf_L + nf_R;
 
         const double dq1 = q1[i] - q0[i];
@@ -104,8 +108,12 @@ void Update2(float* p, const int batch_num, const int middle_size, double* q2, c
         const double f_L = muL * (q1[i] - q1[i - 1]);
         const double l_f = f_R - f_L;
 
-        const double nf_R = (is_middleR) * beta0 * (q1[i + 1] - q1[i]) * (q1[i + 1] - q1[i]) * (q1[i + 1] - q1[i]);
-        const double nf_L = (is_middleL) * beta0 * (q1[i - 1] - q1[i]) * (q1[i - 1] - q1[i]) * (q1[i - 1] - q1[i]);
+        double nf_R = 0.0;
+        double nf_L = 0.0;
+        for(int r = 1; r <= truncationOrder; r++) {
+            nf_R += (is_middleR) * d_beta[r] * (q1[i + r] - q1[i]) * (q1[i + r] - q1[i]) * (q1[i + r] - q1[i]) * (i + r <= n2_R);
+            nf_L += (is_middleL) * d_beta[r] * (q1[i - r] - q1[i]) * (q1[i - r] - q1[i]) * (q1[i - r] - q1[i]) * (i - r >= n2_L);
+        }
         const double nl_f = nf_L + nf_R;
 
         const double dq1 = q1[i] - q0[i];
@@ -211,6 +219,12 @@ public:
         n3_R = n3_L + HeatBath_size - 1;
         model_size = n3_R + 2;
         BATCH = min(1024, (1 << 26) / model_size);
+        vector<float> beta(1025);
+        for(int i = 1; i <= truncationOrder; i++) {
+            beta[i] = beta0/((double)(i * i));
+        }
+        cudaMemcpyToSymbol(d_beta, &beta[0], 605 * sizeof(float));
+
         cerr << n1_L << "," << n1_R << "," << n2_L << "," << n2_R << "," << n3_L << "," << n3_R <<"," << model_size <<  endl;
 
         h_ct_c = (double *)malloc(sizeof(double)* (model_size + 256));
