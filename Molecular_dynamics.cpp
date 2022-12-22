@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+
 using namespace std;
 mt19937_64 mt;                           // 乱数器
 std::normal_distribution<> norm(0, 1.0); // 標準正規分布(平均0,標準偏差1)
@@ -34,8 +35,9 @@ private:
     const double mu1_bath = 1.0; // 熱浴オンサイトポテンシャル
     const double beta0 = 1.0;
 
-    const double temp_h = 1.2; // 高温熱浴の温度
-    const double temp_l = 0.8; // 低温熱浴の温度
+    const double temp = 1.0;
+    const double temp_h = temp * 1.2; // 高温熱浴の温度
+    const double temp_l = temp * 0.8; // 低温熱浴の温度
 
     const double gamma0 = 0.2;                           // Langevin熱浴のgamma係数
     const double c_h = sqrt(2.0 * gamma0 * temp_h * dt); // 高温側の分散
@@ -52,7 +54,6 @@ private:
     double *fluxC;
     double *temperature_plot;
 
-    int statistics_interval = 16;
     long long int count_flux = 0;
     long long int count_temp = 0;
     long long int stepCount = 0;
@@ -175,23 +176,32 @@ public:
 int main(void)
 {
     FPUT_Lattice_1D model = FPUT_Lattice_1D();
-    model.settingSize(20, 256);
-    model.settingStep(10000, 100000, 1000000000);
+    const int heat_N = 20;
+    const int middle_N = 256;
+
+    long long int HeatSimulation = 10000;
+    long long int initialStateStep = 100000;
+    long long int Step = 1000000000;
+
+    long lont int output_interval = 1000000;
+
+    model.settingSize(heat_N, middle_N);
+    model.settingStep(HeatSimulation, initialStateStep, Step);
     std::chrono::system_clock::time_point start, end; // 型は auto で可
     start = std::chrono::system_clock::now();         // 計測開始時間
 
-    for (int i = 0; i < 1000000000 / 16; i++)
+    for (int i = 0; i < Step; i++)
     {
-        if (i == 100000 / 16)
+        if (i == initialStateStep)
             model.statistics_reset();
         model.step();
-        if ((i + 1) % (1000000 / 16) == 0)
+        if ((i + 1) % (output_interval) == 0)
         {
             end = std::chrono::system_clock::now();                                                      // 計測終了時間
             double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(); //処理に要した時間をミリ秒に変換
             model.output_Kappa();
             cerr << elapsed / 1000.0 / 60.0 / 60.0 << "[h]"
-                 << "," << elapsed / 1000.0 / 60.0 / 60.0 / i * 1000000000 / 16 << "[h]" << endl;
+                 << "," << elapsed / 1000.0 / 60.0 / 60.0 / i * Step << "[h]" << endl;
         }
     }
     model.output_Temperature();
