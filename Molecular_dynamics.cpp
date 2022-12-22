@@ -102,43 +102,41 @@ public:
     }
     void step()
     {
-        for (int k = 0; k < statistics_interval; k++)
+        for (int i = n1_L; i <= n3_R; i++)
         {
-            for (int i = n1_L; i <= n3_R; i++)
-            {
-                // 次の粒子状態の計算
-                const int is_middleL = (n2_L < i && i <= n2_R);
-                const int is_middleR = (n2_L <= i && i < n2_R);
-                const double muL = is_middleL * mu1 + !(is_middleL)*mu1_bath;
-                const double muR = is_middleR * mu1 + !(is_middleR)*mu1_bath;
+            // 次の粒子状態の計算
+            const int is_middleL = (n2_L < i && i <= n2_R);
+            const int is_middleR = (n2_L <= i && i < n2_R);
+            const double muL = is_middleL * mu1 + !(is_middleL)*mu1_bath;
+            const double muR = is_middleR * mu1 + !(is_middleR)*mu1_bath;
 
-                const double f_R = muR * (q1[i + 1] - q1[i]);
-                const double f_L = muL * (q1[i] - q1[i - 1]);
-                const double l_f = f_R - f_L;
+            const double f_R = muR * (q1[i + 1] - q1[i]);
+            const double f_L = muL * (q1[i] - q1[i - 1]);
+            const double l_f = f_R - f_L;
 
-                const double nf_R = (is_middleR)*beta0 * (q1[i + 1] - q1[i]) * (q1[i + 1] - q1[i]) * (q1[i + 1] - q1[i]);
-                const double nf_L = (is_middleL)*beta0 * (q1[i - 1] - q1[i]) * (q1[i - 1] - q1[i]) * (q1[i - 1] - q1[i]);
-                const double nl_f = nf_L + nf_R;
+            const double nf_R = (is_middleR)*beta0 * (q1[i + 1] - q1[i]) * (q1[i + 1] - q1[i]) * (q1[i + 1] - q1[i]);
+            const double nf_L = (is_middleL)*beta0 * (q1[i - 1] - q1[i]) * (q1[i - 1] - q1[i]) * (q1[i - 1] - q1[i]);
+            const double nl_f = nf_L + nf_R;
 
-                const double dq1 = q1[i] - q0[i];
-                const double random_f = (stepCount < HeatSimulation || i <= n1_R || i >= n3_L) ? (-gamma_t * dq1 + ct_c[i] * norm(mt)) : 0;
+            const double dq1 = q1[i] - q0[i];
+            const double random_f = (stepCount < HeatSimulation || i <= n1_R || i >= n3_L) ? (-gamma_t * dq1 + ct_c[i] * norm(mt)) : 0;
 
-                const double f = l_f + nl_f - mu0 * q1[i] * (n2_L <= i && i <= n2_R);
-                const double dq2 = dq1 + f * dt2 + random_f;
+            const double f = l_f + nl_f - mu0 * q1[i] * (n2_L <= i && i <= n2_R);
+            const double dq2 = dq1 + f * dt2 + random_f;
 
-                q2[i] = q1[i] + dq2;
+            q2[i] = q1[i] + dq2;
 
-                // 統計量の計算
-                const double p = 0.5 * (q2[i] - q0[i]) * dt_1;
-                fluxC[i] += p * (-f_L + nf_L);
-                temperature_plot[i] += p * p;
-            }
-            count_flux++;
-            count_temp++;
-            std::swap(q0, q1); //q0 <- q1
-            std::swap(q1, q2); //q1 <- q2
-            stepCount++;
+            // 統計量の計算
+            const double p = 0.5 * (q2[i] - q0[i]) * dt_1;
+            fluxC[i] += p * (-f_L + nf_L);
+            temperature_plot[i] += p * p;
         }
+        count_flux++;
+        count_temp++;
+        std::swap(q0, q1); //q0 <- q1
+        std::swap(q1, q2); //q1 <- q2
+        stepCount++;
+        
     }
     void statistics_reset()
     {
@@ -183,7 +181,7 @@ int main(void)
     long long int initialStateStep = 100000;
     long long int Step = 1000000000;
 
-    long lont int output_interval = 1000000;
+    long long int output_interval = 1000000;
 
     model.settingSize(heat_N, middle_N);
     model.settingStep(HeatSimulation, initialStateStep, Step);
